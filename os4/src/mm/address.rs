@@ -126,6 +126,10 @@ impl PhysAddr {
     pub fn aligned(&self) -> bool {
         self.page_offset() == 0
     }
+    /// not impl ops::Add to make this call explicit
+    pub fn add(&self, value: usize) -> Self {
+        Self::from(usize::from(*self) + value)
+    }
 }
 impl From<PhysAddr> for PhysPageNum {
     fn from(v: PhysAddr) -> Self {
