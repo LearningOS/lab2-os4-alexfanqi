@@ -2,6 +2,7 @@
 
 use crate::config::MAX_SYSCALL_NUM;
 use crate::task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, current_user_token};
+use crate::task::get_current_task_info;
 use crate::timer::get_time_us;
 use crate::mm::{try_translate_small_type, translated_large_type, copy_type_into_bufs};
 
@@ -17,6 +18,16 @@ pub struct TaskInfo {
     pub status: TaskStatus,
     pub syscall_times: [u32; MAX_SYSCALL_NUM],
     pub time: usize,
+}
+
+impl TaskInfo {
+    pub fn empty() -> Self {
+        TaskInfo {
+            status: TaskStatus::UnInit,
+            syscall_times: [0; MAX_SYSCALL_NUM],
+            time: 0,
+        }
+    }
 }
 
 pub fn sys_exit(exit_code: i32) -> ! {
@@ -64,5 +75,14 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
 
 // YOUR JOB: 引入虚地址后重写 sys_task_info
 pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
-    -1
+    let mut ti_tmp = TaskInfo::empty();
+    let ret = get_current_task_info(&mut ti_tmp);
+    if let Some(ti) = try_translate_small_type::<TaskInfo>(current_user_token(), ti) {
+        *ti = ti_tmp;
+    }
+    else {
+        let buffers = translated_large_type::<TaskInfo>(current_user_token(), ti);
+        unsafe{ copy_type_into_bufs::<TaskInfo>(&ti_tmp, buffers); };
+    }
+    ret
 }
