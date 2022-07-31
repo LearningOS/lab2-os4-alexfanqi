@@ -230,13 +230,13 @@ pub fn mmap(
         return -1;
     }
     let mut perm = MapPermission::U;
-    if (port & (1 << 0)) == 1 {
+    if (port & (1 << 0)) != 0 {
         perm |= MapPermission::R;
     }
-    if (port & (1 << 1)) == 1 {
+    if (port & (1 << 1)) != 0 {
         perm |= MapPermission::W;
     }
-    if (port & (1 << 2)) == 1 {
+    if (port & (1 << 2)) != 0 {
         perm |= MapPermission::X;
     }
     mem_set.insert_framed_area(
@@ -244,7 +244,7 @@ pub fn mmap(
         end_va,
         perm
     );
-    info!("user mmap: [{:#x}, {:#x}]", usize::from(start_va), usize::from(end_va));
+    info!("[APP {}] user mmap: [{:#x}, {:#x}]", current, usize::from(start_va), usize::from(end_va));
     0
 }
 
@@ -259,6 +259,6 @@ pub fn munmap(
     let start_vn = start_va.floor();
     let end_vn = end_va.ceil();
     let ret = mem_set.unmap_area_exact_range(start_vn, end_vn);
-    info!("user munmap: [{:#x}, {:#x}]", usize::from(start_vn), usize::from(end_vn));
+    info!("[APP {}] user munmap: [{:#x}, {:#x}]", current, usize::from(start_vn), usize::from(end_vn));
     ret
 }
