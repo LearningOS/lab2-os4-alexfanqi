@@ -2,9 +2,10 @@
 
 use crate::config::MAX_SYSCALL_NUM;
 use crate::task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, current_user_token};
-use crate::task::get_current_task_info;
+use crate::task::{get_current_task_info, mmap, munmap};
 use crate::timer::get_time_us;
 use crate::mm::{try_translate_small_type, translated_large_type, copy_type_into_bufs};
+use crate::mm::VirtAddr;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -65,12 +66,30 @@ pub fn sys_set_priority(_prio: isize) -> isize {
 }
 
 // YOUR JOB: 扩展内核以实现 sys_mmap 和 sys_munmap
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    -1
+pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
+    let vstart = VirtAddr::from(start);
+    if ! vstart.aligned() || prot & !0x7 != 0 || prot & 0x7 == 0 {
+        return -1;
+    }
+    if len == 0 {
+        return 0;
+    }
+    
+    let vend = VirtAddr::from(start+len);
+    mmap(vstart, vend, prot)
 }
 
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    -1
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    let vstart = VirtAddr::from(start);
+    if ! vstart.aligned() {
+        return -1;
+    }
+    if len == 0 {
+        return 0;
+    }
+
+    let vend = VirtAddr::from(usize::from(vstart)+len);
+    munmap(vstart, vend)
 }
 
 // YOUR JOB: 引入虚地址后重写 sys_task_info

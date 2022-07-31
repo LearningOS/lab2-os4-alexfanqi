@@ -19,6 +19,7 @@ use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use crate::syscall::TaskInfo;
 use crate::timer::get_time_us;
+use crate::mm::{VirtAddr, MapPermission};
 use alloc::vec::Vec;
 use lazy_static::*;
 pub use switch::__switch;
@@ -213,4 +214,51 @@ pub fn get_current_task_info(ti: &mut TaskInfo) -> isize {
     ti.syscall_times.clone_from_slice(&cur_task.syscall_stats);
     ti.time = (get_time_us()-cur_task.start_time)/1000;
     0
+}
+
+pub fn mmap(
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        port: usize
+    ) -> isize {
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    let cur_task = &mut inner.tasks[current];
+    let mem_set = &mut cur_task.memory_set;
+    let end_va = end_va.ceil().into();
+    if mem_set.has_conflict_with_range(start_va, end_va) {
+        return -1;
+    }
+    let mut perm = MapPermission::U;
+    if (port & (1 << 0)) == 1 {
+        perm |= MapPermission::R;
+    }
+    if (port & (1 << 1)) == 1 {
+        perm |= MapPermission::W;
+    }
+    if (port & (1 << 2)) == 1 {
+        perm |= MapPermission::X;
+    }
+    mem_set.insert_framed_area(
+        start_va,
+        end_va,
+        perm
+    );
+    info!("user mmap: [{:#x}, {:#x}]", usize::from(start_va), usize::from(end_va));
+    0
+}
+
+pub fn munmap(
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+    ) -> isize {
+    let mut inner = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    let cur_task = &mut inner.tasks[current];
+    let mem_set = &mut cur_task.memory_set;
+    let start_vn = start_va.floor();
+    let end_vn = end_va.ceil();
+    let ret = mem_set.unmap_area_exact_range(start_vn, end_vn);
+    info!("user munmap: [{:#x}, {:#x}]", usize::from(start_vn), usize::from(end_vn));
+    ret
 }
